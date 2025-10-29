@@ -63,15 +63,11 @@ public class RunGames implements IGameRunner {
 
         // 2. Setup
         LinkedList<AbstractPlayer> agents = new LinkedList<>();
-        if (!runGames.config.get(playerDirectory).equals("")) {
-            agents.addAll(PlayerFactory.createPlayers((String) runGames.config.get(playerDirectory)));
-        } else {
-       //     agents.add(new MCTSPlayer());
-            agents.add(new BasicMCTSPlayer());
-            agents.add(new RandomPlayer());
-            agents.add(new RMHCPlayer());
-            agents.add(new OSLAPlayer());
-        }
+
+        agents.add(new BasicMCTSPlayer());
+        agents.add(new RandomPlayer());
+        agents.add(new OSLAPlayer());
+
         runGames.agents = agents;
 
         if (!runGames.config.get(focusPlayer).equals("")) {
@@ -92,60 +88,55 @@ public class RunGames implements IGameRunner {
         }
     }
 
+
     @Override
     public void run() {
-        // We are now restricted to SushiGo and 3 players
-        GameType sushiGoGame = GameType.SushiGo;
-        int[] playerCounts = {3}; // Set player count to 3
+        // Now we loop over each game and player count combination
+        for (GameType gameType : gamesAndPlayerCounts.keySet()) {
+            String gameName = gameType.name();
+            //     timeDir.insert(0, gameName + "_");
 
-        // Run the SushiGo game with 3 players
-        System.out.println("Starting SushiGo game with 3 players...");
-        String gameName = sushiGoGame.name();
+            for (int playerCount : gamesAndPlayerCounts.get(gameType)) {
+                System.out.printf("Game: %s, Players: %d\n", gameName, playerCount);
+                String playersDir = playerCount + "-players";
 
-        // Setup the parameters for the game
-        AbstractParameters params = config.get(gameParams).equals("") ? null : AbstractParameters.createFromFile(sushiGoGame, (String) config.get(gameParams));
+                AbstractParameters params = config.get(gameParams).equals("") ? null : AbstractParameters.createFromFile(gameType, (String) config.get(gameParams));
 
-        // Create a RoundRobin tournament for this game
-        RoundRobinTournament tournament = new RoundRobinTournament(agents, sushiGoGame, 3, params, config);
+                RoundRobinTournament tournament = new RoundRobinTournament(agents, gameType, playerCount, params, config);
 
-        // Add listeners for results tracking
-        //noinspection unchecked
-        for (String listenerClass : ((List<String>) config.get(listener))) {
-            try {
-                IGameListener gameTracker = IGameListener.createListener(listenerClass);
-                tournament.addListener(gameTracker);
-                String outputDir = (String) config.get(destDir);
-                List<String> directories = new ArrayList<>(Arrays.asList(outputDir.split(Pattern.quote(File.separator))));
-                directories.add(gameName);
-                if ((boolean) config.get(addTimeStamp))
-                    directories.add(timeDir);
-                gameTracker.setOutputDirectory(directories.toArray(new String[0]));
-            } catch (IllegalArgumentException e) {
-                System.out.println("Error creating listener: " + e.getMessage());
+                // Add listeners
+                //noinspection unchecked
+                for (String listenerClass : ((List<String>) config.get(listener))) {
+                    try {
+                        IGameListener gameTracker = IGameListener.createListener(listenerClass);
+                        tournament.addListener(gameTracker);
+                        String outputDir = (String) config.get(destDir);
+                        List<String> directories = new ArrayList<>(Arrays.asList(outputDir.split(Pattern.quote(File.separator))));
+                        if (gamesAndPlayerCounts.size() > 1)
+                            directories.add(gameName);
+                        if (gamesAndPlayerCounts.get(gameType).length > 1)
+                            directories.add(playersDir);
+                        if ((boolean) config.get(addTimeStamp))
+                            directories.add(timeDir);
+                        gameTracker.setOutputDirectory(directories.toArray(new String[0]));
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Error creating listener: " + e.getMessage());
+                        // this is not a problem as such, we'll still report win rate information which may be all the user wants
+                    }
+                }
+
+                // run tournament
+                tournament.run();
             }
         }
-
-        // Run the tournament
-        tournament.run();
-
-        // Print results to console after the game finishes
-        System.out.println("SushiGo game with 3 players has finished.");
     }
 
     private void initialiseGamesAndPlayerCount() {
-        // Set gameArg to only include SushiGo
-        String gameArg = "SushiGo";  // Only SushiGo
-        String playerRange = "3";    // Only 3 players
-        int np = (int) config.get(RunArg.nPlayers);
-        if (np > 0)
-            playerRange = String.valueOf(np);
-
-        List<String> tempGames = new ArrayList<>(Arrays.asList(gameArg.split("\\|")));
-        List<String> games = tempGames;
-        if (tempGames.get(0).equals("all")) {
-            tempGames.add("-GameTemplate"); // So that we always remove this one
-            games = Arrays.stream(GameType.values()).map(Enum::name).filter(name -> !tempGames.contains("-" + name)).collect(toList());
-        }
+        String gameArg = "SushiGo";
+        int np = 3;
+        String playerRange = String.valueOf(np);
+        List<String> games = new ArrayList<>();
+        games.add(gameArg);
 
         // This creates a <MinPlayer, MaxPlayer> Pair for each game#
         List<Pair<Integer, Integer>> nPlayers = Arrays.stream(playerRange.split("\\|"))
@@ -154,28 +145,51 @@ public class RunGames implements IGameRunner {
                         int hyphenIndex = str.indexOf("-");
                         return new Pair<>(Integer.valueOf(str.substring(0, hyphenIndex)), Integer.valueOf(str.substring(hyphenIndex + 1)));
                     } else if (str.equals("all")) {
-                        return new Pair<>(-1, -1); // The next step will fill in the correct values
+                        return new Pair<>(-1, -1); // the next step will fill in the correct values
                     } else
                         return new Pair<>(Integer.valueOf(str), Integer.valueOf(str));
                 }).collect(toList());
-
-        // Ensure SushiGo is set with 3 players
+        // if only one game size was provided, then it applies to all games in the list
+        // or vice versa
+        if (games.size() == 1 && nPlayers.size() > 1) {
+            for (int loop = 0; loop < nPlayers.size() - 1; loop++)
+                games.add(games.get(0));
+        }
+        if (nPlayers.size() == 1 && games.size() > 1) {
+            for (int loop = 0; loop < games.size() - 1; loop++)
+                nPlayers.add(nPlayers.get(0));
+        }
+        // Then fill in the min/max player counts for the games that were specified as "all"
+        // And repair min/max player counts that were specified incorrectly
         for (int i = 0; i < nPlayers.size(); i++) {
             GameType game = GameType.valueOf(games.get(i));
-            if (game == GameType.SushiGo) {
-                nPlayers.set(i, new Pair<>(3, 3)); // Force 3 players for SushiGo
+            int max = game.getMaxPlayers();
+
+            // Cap max number of players to those available in the framework if no player directory specified
+            // (in which case the framework will use 1 of each default players)
+            if (config.get(playerDirectory).equals("") && max > PlayerType.values().length - 2) {
+                max = PlayerType.values().length - 2;  // Ignore the 2 human players (console, GUI)
             }
+
+            if (nPlayers.get(i).a == -1) {
+                nPlayers.set(i, new Pair<>(game.getMinPlayers(), max));
+            }
+            if (nPlayers.get(i).a < game.getMinPlayers())
+                nPlayers.set(i, new Pair<>(game.getMinPlayers(), nPlayers.get(i).b));
+            if (nPlayers.get(i).b > max)
+                nPlayers.set(i, new Pair<>(nPlayers.get(i).a, max));
         }
+
+        if (nPlayers.size() > 1 && nPlayers.size() != games.size())
+            throw new IllegalArgumentException("If specified, then nPlayers length must be one, or match the length of the games list");
 
         gamesAndPlayerCounts = new LinkedHashMap<>();
         for (int i = 0; i < games.size(); i++) {
             GameType game = GameType.valueOf(games.get(i));
             int minPlayers = nPlayers.get(i).a;
             int maxPlayers = nPlayers.get(i).b;
-
             if (maxPlayers < minPlayers)
-                continue;
-
+                continue;  // in this case the game does not support the desired player count
             int[] playerCounts = new int[maxPlayers - minPlayers + 1];
             Arrays.setAll(playerCounts, n -> n + minPlayers);
             gamesAndPlayerCounts.put(game, playerCounts);
