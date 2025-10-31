@@ -1,11 +1,11 @@
 {
   "game": "SushiGo",
-  "nPlayers": 2,
+  "nPlayers": 3,
   "mode": "random",
-  "matchups": 20,
+  "matchups": 10,
   "verbose": true,
-  "listener": "GameResultsListener.json",
-  "destDir": "outputdir",
-  "distinctRandomSeeds" : 100,
+  "listener": "json/listeners/basiclistener.json",
+  "destDir": "metrics/out",
+  "distinctRandomSeeds" : 10,
   "playerDirectory": "json/players/groupz"
 }

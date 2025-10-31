@@ -1,0 +1,6 @@
+{
+  "class": "players.groupz.GroupZOSLAMinimaxPlayer",
+  "heuristic": {
+    "class": "players.groupz.GroupZSushiGoHeuristics"
+  }
+}
