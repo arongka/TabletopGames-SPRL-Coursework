@@ -63,11 +63,15 @@ public class RunGames implements IGameRunner {
 
         // 2. Setup
         LinkedList<AbstractPlayer> agents = new LinkedList<>();
-
-        agents.add(new BasicMCTSPlayer());
-        agents.add(new RandomPlayer());
-        agents.add(new OSLAPlayer());
-
+        if (!runGames.config.get(playerDirectory).equals("")) {
+            agents.addAll(PlayerFactory.createPlayers((String) runGames.config.get(playerDirectory)));
+        } else {
+            //     agents.add(new MCTSPlayer());
+            agents.add(new BasicMCTSPlayer());
+            agents.add(new RandomPlayer());
+            agents.add(new RMHCPlayer());
+            agents.add(new OSLAPlayer());
+        }
         runGames.agents = agents;
 
         if (!runGames.config.get(focusPlayer).equals("")) {
@@ -132,11 +136,17 @@ public class RunGames implements IGameRunner {
     }
 
     private void initialiseGamesAndPlayerCount() {
-        String gameArg = "SushiGo";
-        int np = 3;
-        String playerRange = String.valueOf(np);
-        List<String> games = new ArrayList<>();
-        games.add(gameArg);
+        String gameArg = config.get(RunArg.game).toString();
+        String playerRange = config.get(RunArg.playerRange).toString();
+        int np = (int) config.get(RunArg.nPlayers);
+        if (np > 0)
+            playerRange = String.valueOf(np);
+        List<String> tempGames = new ArrayList<>(Arrays.asList(gameArg.split("\\|")));
+        List<String> games = tempGames;
+        if (tempGames.get(0).equals("all")) {
+            tempGames.add("-GameTemplate"); // so that  we always remove this one
+            games = Arrays.stream(GameType.values()).map(Enum::name).filter(name -> !tempGames.contains("-" + name)).collect(toList());
+        }
 
         // This creates a <MinPlayer, MaxPlayer> Pair for each game#
         List<Pair<Integer, Integer>> nPlayers = Arrays.stream(playerRange.split("\\|"))
