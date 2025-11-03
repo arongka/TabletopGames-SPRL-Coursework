@@ -13,6 +13,8 @@ import games.sushigo.cards.SGCard.SGCardType;
  * Tunable heuristic for SushiGo (Group Z).
  * Corrected so helper methods return values (primitives can't be modified by reference).
  */
+/* Reference: https://github.com/3RFUNn/SushiGo-AI-Agent-For-TAG-Framework */
+
 public class GroupZSushiGoHeuristics extends TunableParameters implements IStateHeuristic {
 
     // Base score factors
