@@ -1,5 +1,5 @@
 {
-  "class": "players.groupz.GroupZOSLAPlayer",
+  "class": "players.groupz.GroupZMinimaxPlayer",
   "heuristic": {
     "class": "players.groupz.GroupZSushiGoHeuristics"
   },
